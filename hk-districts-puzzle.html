@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>香港十八區拼圖</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #F0F2F5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #header {
+      background: #fff;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.08);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: #E05A5A; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 12px; font-weight: 700; letter-spacing: -.5px;
+    }
+    .logo-text { font-size: 18px; font-weight: 700; color: #1A1A1A; }
+    .spacer { flex: 1; }
+
+    .mode-tabs {
+      display: flex; gap: 4px;
+      padding: 4px; background: #F0F2F5; border-radius: 10px;
+    }
+    .mode-tab {
+      padding: 6px 20px; border-radius: 8px;
+      font-size: 13px; font-weight: 500; color: #9CA3AF;
+      cursor: pointer; border: none; background: transparent;
+      font-family: inherit; transition: all .2s;
+    }
+    .mode-tab.active {
+      background: #fff; font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,.1);
+    }
+    .mode-tab.puzzle.active { color: #E05A5A; }
+    .mode-tab.learn.active  { color: #4A90D9; }
+
+    .stats-area { display: flex; align-items: center; gap: 16px; }
+    .stat-label { font-size: 13px; font-weight: 500; color: #6B7280; transition: color .3s; }
+    .stat-label.complete { color: #22C55E; font-weight: 700; }
+
+    .reset-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 16px; background: #F0F2F5;
+      border: none; border-radius: 8px;
+      font-size: 13px; color: #6B7280;
+      cursor: pointer; font-family: inherit; transition: background .2s;
+    }
+    .reset-btn:hover { background: #E5E7EB; }
+
+    /* ── Progress bar ── */
+    #progress-bar { height: 4px; background: #E5E7EB; flex-shrink: 0; }
+    #progress-fill {
+      height: 100%; width: 0%;
+      background: #E05A5A; border-radius: 0 2px 2px 0;
+      transition: width .5s ease, background .5s;
+    }
+    #progress-fill.done { background: #22C55E; }
+
+    /* ── Body ── */
+    #body { flex: 1; display: flex; overflow: hidden; }
+
+    /* ── Map Pane ── */
+    #map-pane {
+      flex: 1; display: flex; flex-direction: column;
+      padding: 12px; gap: 10px; overflow: hidden;
+    }
+    #map-container {
+      flex: 1; background: #fff; border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+      display: flex; flex-direction: column;
+      align-items: center; padding: 10px 12px 8px;
+      position: relative; overflow: hidden; min-height: 0;
+    }
+    #map-hint {
+      font-size: 12px; color: #9CA3AF; font-weight: 500;
+      padding-bottom: 6px; flex-shrink: 0; text-align: center;
+    }
+    #map-svg-wrapper {
+      flex: 1; width: 100%; min-height: 0;
+      display: flex; align-items: stretch;
+    }
+    #map-svg { width: 100%; height: 100%; display: block; }
+
+    #map-legend {
+      display: flex; gap: 16px; align-items: center;
+      padding-top: 6px; flex-shrink: 0;
+    }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #64748B; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+    /* ── Map SVG ── */
+    .district-path {
+      stroke: #fff; stroke-width: 1.2;
+      cursor: pointer; transition: opacity .15s, fill .35s;
+    }
+    .district-path.empty { fill: #E2E8F0; stroke: #C5CDD8; }
+    .district-path:hover  { opacity: .8; }
+    .district-path.highlighted { stroke: #1A1A1A !important; stroke-width: 2.5 !important; }
+
+    @keyframes flash-wrong {
+      0%, 100% { fill: #E2E8F0; }
+      25%, 75%  { fill: #FECACA; }
+      50%       { fill: #FCA5A5; }
+    }
+    .district-path.wrong { animation: flash-wrong .5s ease; }
+
+    .district-label {
+      font-size: 9px; font-weight: 600;
+      fill: rgba(255,255,255,.92); text-anchor: middle;
+      pointer-events: none;
+      paint-order: stroke;
+      stroke: rgba(0,0,0,.25); stroke-width: 2px;
+    }
+
+    /* ── Tags Panel ── */
+    #tags-panel {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      padding: 14px 16px; flex-shrink: 0;
+    }
+    #tags-title { font-size: 12px; font-weight: 600; color: #9CA3AF; margin-bottom: 10px; }
+    #tags-grid { display: flex; flex-wrap: wrap; gap: 7px; }
+
+    .district-tag {
+      padding: 6px 14px; border-radius: 20px;
+      font-size: 13px; font-weight: 500;
+      cursor: pointer; border: 2px solid transparent;
+      font-family: inherit; transition: all .18s;
+      user-select: none;
+    }
+    .district-tag.hk  { background: #FEF3F2; color: #E05A5A; }
+    .district-tag.kln { background: #EFF6FF; color: #4A90D9; }
+    .district-tag.nt  { background: #F0FFF4; color: #5AAE6A; }
+    .district-tag.selected {
+      border-color: currentColor;
+      box-shadow: 0 2px 8px rgba(0,0,0,.15);
+      transform: translateY(-1px);
+    }
+    .district-tag.done {
+      opacity: .45; text-decoration: line-through;
+      cursor: default; pointer-events: none;
+    }
+
+    /* ── Info Panel ── */
+    #info-panel {
+      width: 300px; background: #fff;
+      box-shadow: -2px 0 12px rgba(0,0,0,.06);
+      display: flex; flex-direction: column;
+      flex-shrink: 0; overflow-y: auto;
+    }
+    #info-empty {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px; padding: 32px; color: #9CA3AF;
+    }
+    .info-empty-title { font-size: 14px; font-weight: 500; }
+    .info-empty-hint  { font-size: 12px; text-align: center; line-height: 1.7; color: #CBD5E1; }
+    #info-content { display: none; flex-direction: column; }
+    #info-banner  { padding: 20px 20px 16px; display: flex; flex-direction: column; gap: 4px; }
+    .info-region-badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 12px;
+      font-size: 11px; font-weight: 600; color: #fff;
+      background: rgba(255,255,255,.25); align-self: flex-start; margin-bottom: 4px;
+    }
+    .info-district-name { font-size: 24px; font-weight: 700; color: #fff; }
+    .info-district-eng  { font-size: 13px; color: rgba(255,255,255,.7); }
+    #info-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .info-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .info-stat-card {
+      padding: 12px; border-radius: 12px;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .info-stat-card.pop  { background: #FEF3F2; }
+    .info-stat-card.area { background: #EFF6FF; }
+    .info-stat-value { font-size: 15px; font-weight: 700; color: #1A1A1A; }
+    .info-stat-meta  { font-size: 11px; color: #9CA3AF; }
+    .info-divider    { height: 1px; background: #F3F4F6; }
+    .info-section    { display: flex; flex-direction: column; gap: 6px; }
+    .info-section-label { font-size: 12px; font-weight: 600; color: #9CA3AF; }
+    .info-section-text  { font-size: 13px; color: #374151; line-height: 1.65; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; top: 80px; left: 50%;
+      transform: translateX(-50%) translateY(-16px);
+      background: #22C55E; color: #fff;
+      padding: 10px 22px; border-radius: 20px;
+      font-size: 13px; font-weight: 600;
+      box-shadow: 0 4px 16px rgba(34,197,94,.35);
+      opacity: 0; transition: all .3s; pointer-events: none; z-index: 100;
+    }
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── Zoom controls ── */
+    #zoom-controls {
+      position: absolute; right: 12px; bottom: 44px;
+      display: flex; flex-direction: column;
+      gap: 2px; z-index: 4;
+    }
+    .zoom-btn {
+      width: 32px; height: 32px;
+      background: #fff; border: 1px solid #E5E7EB;
+      border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #374151; font-weight: 300;
+      box-shadow: 0 1px 4px rgba(0,0,0,.12);
+      transition: background .15s, box-shadow .15s;
+      line-height: 1; user-select: none;
+    }
+    .zoom-btn:hover  { background: #F9FAFB; box-shadow: 0 2px 8px rgba(0,0,0,.16); }
+    .zoom-btn:active { background: #F3F4F6; }
+    #zoom-reset {
+      width: 32px; height: 22px; font-size: 10px; font-weight: 600;
+      color: #6B7280; letter-spacing: .3px; margin-top: 4px;
+    }
+
+    /* ── Loading ── */
+    #loading {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      background: rgba(255,255,255,.9); z-index: 5;
+    }
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #E5E7EB; border-top-color: #E05A5A;
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Completion overlay ── */
+    #completion-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55);
+      display: none; align-items: center; justify-content: center; z-index: 200;
+    }
+    #completion-overlay.show { display: flex; }
+    .completion-card {
+      background: #fff; border-radius: 24px;
+      padding: 48px; text-align: center;
+      max-width: 400px; width: 90%;
+      box-shadow: 0 24px 64px rgba(0,0,0,.2);
+      animation: pop-in .35s cubic-bezier(.34,1.56,.64,1);
+    }
+    @keyframes pop-in {
+      from { opacity: 0; transform: scale(.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+    .comp-icon { font-size: 56px; margin-bottom: 12px; }
+    .comp-title { font-size: 28px; font-weight: 700; color: #1A1A1A; margin-bottom: 6px; }
+    .comp-sub   { font-size: 15px; color: #6B7280; margin-bottom: 32px; }
+    .comp-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 28px; }
+    .comp-stat  { background: #F8F9FA; border-radius: 14px; padding: 18px; }
+    .comp-stat-val { font-size: 26px; font-weight: 700; color: #1A1A1A; }
+    .comp-stat-lbl { font-size: 12px; color: #9CA3AF; margin-top: 4px; }
+    .comp-btn {
+      width: 100%; padding: 14px;
+      background: #E05A5A; color: #fff; border: none;
+      border-radius: 12px; font-size: 15px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background .2s;
+    }
+    .comp-btn:hover { background: #D04848; }
+
+    /* ── Mobile ── */
+    @media (max-width: 768px) {
+      body { height: auto; min-height: 100vh; overflow-y: auto; }
+      #header { height: auto; padding: 12px 16px; flex-wrap: wrap; gap: 10px; }
+      .logo-text { font-size: 15px; }
+      #body { flex-direction: column; overflow: visible; }
+      #map-pane { padding: 12px; height: auto; gap: 10px; }
+      #map-container { height: 300px; flex: none; }
+      #map-svg-wrapper { min-height: 0; }
+      #info-panel {
+        width: 100%; flex-shrink: 0;
+        box-shadow: 0 -4px 20px rgba(0,0,0,.08);
+        border-radius: 20px 20px 0 0;
+      }
+      .completion-card { padding: 32px 24px; }
+    }
+    @media (max-width: 480px) {
+      .mode-tabs { width: 100%; }
+      .mode-tab  { flex: 1; }
+      .reset-btn .btn-label { display: none; }
+      .stats-area { gap: 10px; }
+      .stat-label { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+<div id="header">
+  <div class="logo">
+    <div class="logo-icon">HK</div>
+    <span class="logo-text">香港十八區拼圖</span>
+  </div>
+  <div class="spacer"></div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab puzzle active" onclick="setMode('puzzle')">拼圖模式</button>
+    <button class="mode-tab learn"         onclick="setMode('learn')">學習模式</button>
+  </div>
+
+  <div class="stats-area" id="stats-area">
+    <span class="stat-label" id="lbl-progress">完成 0 / 18</span>
+    <span class="stat-label" id="lbl-errors">錯誤次數：0</span>
+  </div>
+
+  <button class="reset-btn" onclick="resetGame()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+      <path d="M3 3v5h5"/>
+    </svg>
+    <span class="btn-label">重置</span>
+  </button>
+</div>
+
+<div id="progress-bar"><div id="progress-fill"></div></div>
+
+<!-- ═══════════════════════════════ BODY ════════════════════════════════ -->
+<div id="body">
+
+  <!-- Map Pane -->
+  <div id="map-pane">
+    <div id="map-container">
+      <div id="loading">
+        <div class="spinner"></div>
+        <span style="font-size:13px;color:#9CA3AF">載入地圖中…</span>
+      </div>
+      <div id="map-hint">拼圖模式：選擇下方名稱後，點選地圖對應區域</div>
+      <div id="map-svg-wrapper">
+        <svg id="map-svg"></svg>
+        <div id="zoom-controls">
+          <button class="zoom-btn" id="zoom-in"    onclick="zoomBy(1.5)" title="放大">＋</button>
+          <button class="zoom-btn" id="zoom-out"   onclick="zoomBy(1/1.5)" title="縮小">－</button>
+          <button class="zoom-btn" id="zoom-reset" onclick="zoomReset()" title="重置縮放">全圖</button>
+        </div>
+      </div>
+      <div id="map-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#E05A5A"></div>香港島</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4A90D9"></div>九龍</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#5AAE6A"></div>新界</div>
+      </div>
+    </div>
+
+    <div id="tags-panel">
+      <div id="tags-title">選擇行政區名稱，再點選地圖上對應位置</div>
+      <div id="tags-grid"></div>
+    </div>
+  </div>
+
+  <!-- Info Panel -->
+  <div id="info-panel">
+    <div id="info-empty">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+        <circle cx="12" cy="10" r="3"/>
+      </svg>
+      <div class="info-empty-title">尚未選擇行政區</div>
+      <div class="info-empty-hint">選擇名稱標籤後<br>點選地圖上的區域</div>
+    </div>
+    <div id="info-content">
+      <div id="info-banner">
+        <div class="info-region-badge" id="info-region">香港島</div>
+        <div class="info-district-name" id="info-name">—</div>
+        <div class="info-district-eng"  id="info-eng">—</div>
+      </div>
+      <div id="info-body">
+        <div class="info-stats">
+          <div class="info-stat-card pop">
+            <div class="info-stat-meta">人口（普查）</div>
+            <div class="info-stat-value" id="info-pop">—</div>
+          </div>
+          <div class="info-stat-card area">
+            <div class="info-stat-meta">面積</div>
+            <div class="info-stat-value" id="info-area">—</div>
+          </div>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-section">
+          <div class="info-section-label">代表地標</div>
+          <div class="info-section-text" id="info-landmark">—</div>
+        </div>
+        <div class="info-section">
+          <div class="info-section-label">區域特色</div>
+          <div class="info-section-text" id="info-desc">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast / Completion -->
+<div id="toast"></div>
+
+<div id="completion-overlay">
+  <div class="completion-card">
+    <div class="comp-icon">🎉</div>
+    <div class="comp-title">全部完成！</div>
+    <div class="comp-sub">你已成功配對香港十八區</div>
+    <div class="comp-stats">
+      <div class="comp-stat">
+        <div class="comp-stat-val" id="comp-time">—</div>
+        <div class="comp-stat-lbl">完成時間</div>
+      </div>
+      <div class="comp-stat">
+        <div class="comp-stat-val" id="comp-errors">0</div>
+        <div class="comp-stat-lbl">錯誤次數</div>
+      </div>
+    </div>
+    <button class="comp-btn" onclick="resetGame()">再玩一次</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ SCRIPT ══════════════════════════════ -->
+<script>
+// ─────────────────────────────────────────────────────────────────────────
+// District metadata
+// ─────────────────────────────────────────────────────────────────────────
+const DISTRICTS = {
+  'Central and Western': {
+    name: '中西區', eng: 'Central and Western', region: 'hk', color: '#E05A5A',
+    population: '235,900', area: '12.44 km²',
+    landmark: '中環金融區、太平山頂、荷李活道',
+    desc: '香港的政治及商業核心，匯聚政府總部、中環金融區及維多利亞港海濱，兼具百年歷史建築與現代摩天大廈。'
+  },
+  'Wan Chai': {
+    name: '灣仔區', eng: 'Wan Chai', region: 'hk', color: '#D44848',
+    population: '180,800', area: '9.83 km²',
+    landmark: '香港會議展覽中心、金紫荊廣場',
+    desc: '香港重要的商業及娛樂中心，以多元文化著稱，匯聚本地特色小店、老字號食肆與國際品牌。'
+  },
+  'Eastern': {
+    name: '東區', eng: 'Eastern', region: 'hk', color: '#F07070',
+    population: '527,700', area: '18.85 km²',
+    landmark: '鰂魚涌、太古城、柴灣',
+    desc: '香港島東部最大行政區，以住宅區為主，太古城為著名的大型商業及居住中心。'
+  },
+  'Southern': {
+    name: '南區', eng: 'Southern', region: 'hk', color: '#E88888',
+    population: '270,400', area: '38.85 km²',
+    landmark: '赤柱、海洋公園、香港仔漁村',
+    desc: '擁有香港島最大面積，以自然景觀著稱，包括赤柱海灘、南丫島及充滿漁港氣息的香港仔。'
+  },
+  'Yau Tsim Mong': {
+    name: '油尖旺區', eng: 'Yau Tsim Mong', region: 'kln', color: '#4A90D9',
+    population: '320,200', area: '6.99 km²',
+    landmark: '旺角、尖沙咀、廟街夜市',
+    desc: '九龍最繁華的購物及旅遊區，廟街夜市、廣東道名店及充滿活力的旺角街頭文化各具特色。'
+  },
+  'Sham Shui Po': {
+    name: '深水埗區', eng: 'Sham Shui Po', region: 'kln', color: '#3A7FC8',
+    population: '405,900', area: '9.35 km²',
+    landmark: '鴨寮街、黃金電腦商場、李鄭屋漢墓',
+    desc: '以電子產品及舊式街市著稱，鴨寮街是全港著名的二手電子集散地，區內亦保存有珍貴的漢代古跡。'
+  },
+  'Kowloon City': {
+    name: '九龍城區', eng: 'Kowloon City', region: 'kln', color: '#5AA0E9',
+    population: '381,500', area: '10.02 km²',
+    landmark: '宋王臺、土瓜灣、啟德發展區',
+    desc: '歷史豐富的行政區，昔日啟德機場所在地，現正發展成新的都市核心，土瓜灣保留大量本地工業歷史痕跡。'
+  },
+  'Wong Tai Sin': {
+    name: '黃大仙區', eng: 'Wong Tai Sin', region: 'kln', color: '#6AB0F9',
+    population: '419,500', area: '9.30 km²',
+    landmark: '黃大仙祠、鑽石山荷里活廣場',
+    desc: '以黃大仙祠聞名，為香港著名道教廟宇，每年農曆新年吸引大批善信及旅客前往祈福。'
+  },
+  'Kwun Tong': {
+    name: '觀塘區', eng: 'Kwun Tong', region: 'kln', color: '#2A70B8',
+    population: '648,200', area: '11.27 km²',
+    landmark: '觀塘工業區（創意產業）、APM 商場、觀塘海濱',
+    desc: '香港人口最多的行政區，舊工業區正轉型為商業及創意產業中心，海濱長廊為市民熱門休閒地點。'
+  },
+  'Kwai Tsing': {
+    name: '葵青區', eng: 'Kwai Tsing', region: 'nt', color: '#5AAE6A',
+    population: '497,000', area: '23.34 km²',
+    landmark: '葵涌貨櫃碼頭、青衣城',
+    desc: '葵涌貨櫃碼頭為全球最繁忙港口之一，是香港對外貿易的重要基地；青衣島則有大型商場及住宅發展。'
+  },
+  'Tsuen Wan': {
+    name: '荃灣區', eng: 'Tsuen Wan', region: 'nt', color: '#4A9E5A',
+    population: '320,000', area: '62.74 km²',
+    landmark: '城門水塘、三棟屋博物館、荃灣廣場',
+    desc: '新界最早發展的新市鎮之一，城門水塘為熱門郊遊勝地，亦保存有逾百年歷史的客家圍村文化。'
+  },
+  'Tuen Mun': {
+    name: '屯門區', eng: 'Tuen Mun', region: 'nt', color: '#6BBF7B',
+    population: '487,100', area: '82.89 km²',
+    landmark: '青山禪院、黃金海岸、屯門公路',
+    desc: '新界西部重要新市鎮，青山禪院為香港最古老的佛寺之一，黃金海岸沙灘是夏日消暑熱點。'
+  },
+  'Yuen Long': {
+    name: '元朗區', eng: 'Yuen Long', region: 'nt', color: '#3A8E4A',
+    population: '614,000', area: '138.55 km²',
+    landmark: '香港濕地公園、錦田古圍村、大棠楓香林',
+    desc: '新界面積最大的行政區，濕地公園為國際重要濕地，大棠楓香林每年深秋吸引大批遊人觀賞紅葉。'
+  },
+  'North': {
+    name: '北區', eng: 'North', region: 'nt', color: '#7CCE8C',
+    population: '313,600', area: '136.61 km²',
+    landmark: '沙頭角、落馬洲、文錦渡',
+    desc: '與深圳接壤的邊境行政區，保留多個傳統客家圍村，現正積極發展北部都會區，推動跨境融合。'
+  },
+  'Tai Po': {
+    name: '大埔區', eng: 'Tai Po', region: 'nt', color: '#2A7E3A',
+    population: '307,000', area: '136.15 km²',
+    landmark: '吐露港、大埔墟街市、大尾篤',
+    desc: '環抱吐露港的寧靜行政區，設有香港鐵路博物館，大尾篤是賞鳥、獨木舟及郊遊的著名地點。'
+  },
+  'Sha Tin': {
+    name: '沙田區', eng: 'Sha Tin', region: 'nt', color: '#5BBE6B',
+    population: '685,000', area: '68.74 km²',
+    landmark: '沙田馬場、城門河、萬佛寺',
+    desc: '新界最大的新市鎮，沙田馬場是香港賽馬的重要場地，城門河畔的單車徑深受市民喜愛。'
+  },
+  'Sai Kung': {
+    name: '西貢區', eng: 'Sai Kung', region: 'nt', color: '#1A6E2A',
+    population: '461,000', area: '129.65 km²',
+    landmark: '麥理浩徑、萬宜水庫、西貢市中心',
+    desc: '香港的「後花園」，擁有大量郊野公園及海岸公園，麥理浩徑為香港最著名的長途遠足路線。'
+  },
+  'Islands': {
+    name: '離島區', eng: 'Islands', region: 'nt', color: '#8BCE9C',
+    population: '176,000', area: '175.07 km²',
+    landmark: '大嶼山、香港國際機場、大澳漁村',
+    desc: '香港陸地面積最大的行政區，包含大嶼山等多個離島，大澳保留了傳統棚屋漁村的獨特面貌。'
+  }
+};
+
+const REGION_META = {
+  hk:  { name: '香港島', color: '#E05A5A' },
+  kln: { name: '九龍',   color: '#4A90D9' },
+  nt:  { name: '新界',   color: '#5AAE6A' }
+};
+
+// ─────────────────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────────────────
+let mode        = 'puzzle';
+let selectedTag = null;
+let completed   = new Set();
+let errors      = 0;
+let startTime   = Date.now();
+let svgEl, projection, pathGen, zoomBehavior, currentTransform = d3.zoomIdentity;
+
+// ─────────────────────────────────────────────────────────────────────────
+// GeoJSON
+// ─────────────────────────────────────────────────────────────────────────
+const GEOJSON_URLS = [
+  'https://raw.githubusercontent.com/southparkstan123/hong-kong-geojson/main/hong-kong.json'
+];
+
+async function fetchGeoJSON() {
+  for (const url of GEOJSON_URLS) {
+    try {
+      const r = await fetch(url);
+      if (r.ok) return await r.json();
+    } catch (_) {}
+  }
+  return null;
+}
+
+// Flexible property name lookup — tries many common naming conventions
+function getEname(props) {
+  const keys = ['ENAME','ENG_NAME','Name_Eng','DISTRICT_E','District_E','english','name_en','name'];
+  for (const k of keys) {
+    if (props[k] && DISTRICTS[props[k]]) return props[k];
+  }
+  // Last resort: scan all values
+  for (const v of Object.values(props)) {
+    if (typeof v === 'string' && DISTRICTS[v]) return v;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Map init
+// ─────────────────────────────────────────────────────────────────────────
+function initMap(geojson) {
+  const wrapper = document.getElementById('map-svg-wrapper');
+  const W = wrapper.clientWidth  || 600;
+  const H = wrapper.clientHeight || 380;
+
+  svgEl = d3.select('#map-svg')
+    .attr('viewBox', `0 0 ${W} ${H}`)
+    .attr('preserveAspectRatio', 'xMidYMid meet');
+
+  projection = d3.geoMercator()
+    .fitExtent([[4, 4], [W - 4, H - 4]], geojson);
+
+  pathGen = d3.geoPath().projection(projection);
+
+  const g      = svgEl.append('g').attr('class', 'g-districts');
+  const gLabel = svgEl.append('g').attr('class', 'g-labels').style('display', 'none');
+
+  g.selectAll('path')
+    .data(geojson.features)
+    .join('path')
+      .attr('class', 'district-path empty')
+      .attr('d', pathGen)
+      .attr('data-ename', d => getEname(d.properties) || '')
+      .on('click',      onMapClick)
+      .on('mouseenter', onMapEnter)
+      .on('mouseleave', onMapLeave);
+
+  // Labels (centroid)
+  geojson.features.forEach(f => {
+    const ename = getEname(f.properties);
+    if (!ename) return;
+    const [cx, cy] = pathGen.centroid(f);
+    if (isNaN(cx)) return;
+    gLabel.append('text')
+      .attr('class', 'district-label')
+      .attr('data-ename', ename)
+      .attr('x', cx).attr('y', cy + 1)
+      .style('display', 'none')
+      .text(DISTRICTS[ename].name.replace('區', ''));
+  });
+
+  // ── Zoom behaviour ──
+  zoomBehavior = d3.zoom()
+    .scaleExtent([0.8, 12])
+    .on('zoom', e => {
+      currentTransform = e.transform;
+      svgEl.select('.g-districts').attr('transform', e.transform);
+      svgEl.select('.g-labels').attr('transform', e.transform);
+      // Scale stroke so borders stay crisp when zoomed
+      const k = e.transform.k;
+      svgEl.selectAll('.district-path')
+        .style('stroke-width', (1.2 / k) + 'px');
+      svgEl.selectAll('.district-label')
+        .attr('font-size', (9 / k) + 'px');
+    });
+
+  svgEl.call(zoomBehavior)
+    // Disable double-click zoom (conflicts with game click)
+    .on('dblclick.zoom', null);
+
+  document.getElementById('loading').style.display = 'none';
+  if (mode === 'learn') applyLearnMode();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Zoom controls
+// ─────────────────────────────────────────────────────────────────────────
+function zoomBy(factor) {
+  svgEl.transition().duration(300)
+    .call(zoomBehavior.scaleBy, factor);
+}
+function zoomReset() {
+  svgEl.transition().duration(400)
+    .call(zoomBehavior.transform, d3.zoomIdentity);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Map events
+// ─────────────────────────────────────────────────────────────────────────
+function onMapClick(event, d) {
+  const ename = getEname(d.properties);
+  if (!ename) return;
+
+  if (mode === 'learn') {
+    svgEl.selectAll('.district-path').classed('highlighted', false);
+    d3.select(this).classed('highlighted', true);
+    showInfo(ename);
+    return;
+  }
+
+  // Puzzle mode
+  if (completed.has(ename)) { showInfo(ename); return; }
+  if (!selectedTag) return;
+
+  if (selectedTag === ename) {
+    doCorrectMatch(ename, this);
+  } else {
+    doWrongMatch(this);
+  }
+}
+
+function onMapEnter(event, d) {
+  const ename = getEname(d.properties);
+  if (ename && !completed.has(ename)) d3.select(this).style('opacity', .75);
+}
+function onMapLeave() { d3.select(this).style('opacity', null); }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Game logic
+// ─────────────────────────────────────────────────────────────────────────
+function doCorrectMatch(ename, pathEl) {
+  const d = DISTRICTS[ename];
+  completed.add(ename);
+
+  d3.select(pathEl).classed('empty', false).attr('fill', d.color);
+  svgEl.select(`.district-label[data-ename="${ename}"]`).style('display', 'block');
+
+  // Mark tag done
+  document.querySelector(`.district-tag[data-ename="${ename}"]`)?.classList.add('done');
+
+  // Deselect tag
+  if (selectedTag) {
+    document.querySelector(`.district-tag[data-ename="${selectedTag}"]`)?.classList.remove('selected');
+    selectedTag = null;
+  }
+
+  showInfo(ename);
+  showToast(`✓  ${d.name} 配對正確！`);
+  updateStats();
+
+  if (completed.size === 18) setTimeout(showCompletion, 900);
+}
+
+function doWrongMatch(pathEl) {
+  errors++;
+  updateStats();
+  const p = d3.select(pathEl);
+  p.classed('wrong', true);
+  setTimeout(() => p.classed('wrong', false), 550);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tag clicks
+// ─────────────────────────────────────────────────────────────────────────
+function onTagClick(ename) {
+  if (completed.has(ename)) return;
+
+  if (selectedTag === ename) {
+    document.querySelector(`.district-tag[data-ename="${ename}"]`)?.classList.remove('selected');
+    selectedTag = null;
+    return;
+  }
+
+  if (selectedTag) {
+    document.querySelector(`.district-tag[data-ename="${selectedTag}"]`)?.classList.remove('selected');
+  }
+  selectedTag = ename;
+  document.querySelector(`.district-tag[data-ename="${ename}"]`)?.classList.add('selected');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Mode switching
+// ─────────────────────────────────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.mode-tab.${m}`).classList.add('active');
+
+  document.getElementById('map-hint').textContent = m === 'puzzle'
+    ? '拼圖模式：選擇下方名稱後，點選地圖對應區域'
+    : '學習模式：點選任一區域查看詳細資訊';
+
+  document.getElementById('tags-panel').style.display  = m === 'puzzle' ? '' : 'none';
+  document.getElementById('stats-area').style.display  = m === 'puzzle' ? 'flex' : 'none';
+
+  if (selectedTag) {
+    document.querySelector(`.district-tag[data-ename="${selectedTag}"]`)?.classList.remove('selected');
+    selectedTag = null;
+  }
+
+  if (svgEl) {
+    svgEl.selectAll('.district-path').classed('highlighted', false);
+    m === 'learn' ? applyLearnMode() : applyPuzzleMode();
+  }
+}
+
+function applyLearnMode() {
+  svgEl.selectAll('.district-path').each(function(d) {
+    const ename = getEname(d.properties);
+    if (ename) d3.select(this).classed('empty', false).attr('fill', DISTRICTS[ename].color);
+  });
+  svgEl.selectAll('.district-label').style('display', 'block');
+}
+
+function applyPuzzleMode() {
+  svgEl.selectAll('.district-path').each(function(d) {
+    const ename = getEname(d.properties);
+    if (!ename) return;
+    if (completed.has(ename)) {
+      d3.select(this).classed('empty', false).attr('fill', DISTRICTS[ename].color);
+    } else {
+      d3.select(this).classed('empty', true).attr('fill', null);
+    }
+  });
+  svgEl.selectAll('.district-label').each(function() {
+    const ename = d3.select(this).attr('data-ename');
+    d3.select(this).style('display', completed.has(ename) ? 'block' : 'none');
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// UI helpers
+// ─────────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const pct  = (completed.size / 18) * 100;
+  const fill = document.getElementById('progress-fill');
+  fill.style.width = pct + '%';
+  fill.className = 'done' in fill.classList || completed.size === 18 ? 'done' : '';
+  if (completed.size === 18) fill.classList.add('done');
+
+  const lbl = document.getElementById('lbl-progress');
+  lbl.textContent = `完成 ${completed.size} / 18`;
+  lbl.className = completed.size === 18 ? 'stat-label complete' : 'stat-label';
+  document.getElementById('lbl-errors').textContent = `錯誤次數：${errors}`;
+}
+
+function showInfo(ename) {
+  const d = DISTRICTS[ename];
+  const r = REGION_META[d.region];
+
+  document.getElementById('info-empty').style.display   = 'none';
+  const content = document.getElementById('info-content');
+  content.style.display = 'flex';
+
+  document.getElementById('info-banner').style.background =
+    `linear-gradient(150deg, ${d.color} 0%, ${d.color}BB 100%)`;
+  document.getElementById('info-region').textContent   = r.name;
+  document.getElementById('info-name').textContent     = d.name;
+  document.getElementById('info-eng').textContent      = d.eng;
+  document.getElementById('info-pop').textContent      = d.population;
+  document.getElementById('info-area').textContent     = d.area;
+  document.getElementById('info-landmark').textContent = d.landmark;
+  document.getElementById('info-desc').textContent     = d.desc;
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Completion
+// ─────────────────────────────────────────────────────────────────────────
+function showCompletion() {
+  const secs = Math.floor((Date.now() - startTime) / 1000);
+  const m = Math.floor(secs / 60), s = secs % 60;
+  document.getElementById('comp-time').textContent   = m ? `${m} 分 ${s} 秒` : `${s} 秒`;
+  document.getElementById('comp-errors').textContent = errors;
+  document.getElementById('completion-overlay').classList.add('show');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Reset
+// ─────────────────────────────────────────────────────────────────────────
+function resetGame() {
+  completed.clear(); errors = 0; selectedTag = null; startTime = Date.now();
+  updateStats();
+
+  document.querySelectorAll('.district-tag').forEach(t =>
+    t.classList.remove('selected', 'done'));
+
+  if (svgEl) {
+    svgEl.selectAll('.district-path')
+      .classed('empty', true).classed('highlighted', false).attr('fill', null);
+    svgEl.selectAll('.district-label').style('display', 'none');
+  }
+
+  document.getElementById('info-empty').style.display   = 'flex';
+  document.getElementById('info-content').style.display = 'none';
+  document.getElementById('completion-overlay').classList.remove('show');
+
+  if (mode !== 'puzzle') setMode('puzzle');
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Build tag list (shuffled)
+// ─────────────────────────────────────────────────────────────────────────
+function buildTags() {
+  const grid = document.getElementById('tags-grid');
+  const entries = Object.entries(DISTRICTS).sort(() => Math.random() - .5);
+  entries.forEach(([ename, d]) => {
+    const btn = document.createElement('button');
+    btn.className = `district-tag ${d.region}`;
+    btn.textContent = d.name;
+    btn.dataset.ename = ename;
+    btn.addEventListener('click', () => onTagClick(ename));
+    grid.appendChild(btn);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Boot
+// ─────────────────────────────────────────────────────────────────────────
+async function init() {
+  buildTags();
+
+  const geojson = await fetchGeoJSON();
+  if (geojson) {
+    initMap(geojson);
+  } else {
+    document.getElementById('loading').innerHTML = `
+      <div style="text-align:center;padding:24px;color:#9CA3AF">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5" style="margin-bottom:10px">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div style="font-size:14px;margin-bottom:6px">無法載入地圖資料</div>
+        <div style="font-size:12px">請確認網路連線後重新整理頁面</div>
+      </div>`;
+  }
+}
+
+init();
+</script>
+</body>
+</html>
