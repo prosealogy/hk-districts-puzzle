@@ -216,6 +216,42 @@
       line-height: 1.5;
     }
 
+    /* ── District Image ── */
+    #info-image-wrap {
+      position: relative; height: 150px; overflow: hidden;
+      background: #F3F4F6; flex-shrink: 0;
+    }
+    #info-image {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: none;
+      transition: opacity .4s;
+    }
+    #info-image.loaded { display: block; }
+    #info-image-skeleton {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 8px; color: #CBD5E1;
+    }
+    #info-image-skeleton.hidden { display: none; }
+    .skeleton-icon { opacity: .4; }
+    .skeleton-text { font-size: 12px; color: #CBD5E1; }
+
+    /* ── History Timeline ── */
+    .history-list { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+    .history-item { display: flex; gap: 10px; align-items: flex-start; }
+    .history-year {
+      flex-shrink: 0; min-width: 40px;
+      font-size: 11px; font-weight: 700;
+      color: #fff; background: #6B7280;
+      border-radius: 4px; padding: 1px 6px;
+      margin-top: 1px; text-align: center;
+    }
+    .history-year.hk  { background: #E05A5A; }
+    .history-year.kln { background: #4A90D9; }
+    .history-year.nt  { background: #5AAE6A; }
+    .history-event { font-size: 12px; color: #4B5563; line-height: 1.6; }
+
     /* ── Toast ── */
     #toast {
       position: fixed; top: 80px; left: 50%;
@@ -402,6 +438,16 @@
         <div class="info-district-name" id="info-name">—</div>
         <div class="info-district-eng"  id="info-eng">—</div>
       </div>
+      <div id="info-image-wrap">
+        <img id="info-image" alt="" />
+        <div id="info-image-skeleton">
+          <svg class="skeleton-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          <span class="skeleton-text">載入景點圖片…</span>
+        </div>
+      </div>
       <div id="info-body">
         <div class="info-stats">
           <div class="info-stat-card pop">
@@ -425,6 +471,11 @@
         <div class="info-section" id="info-trip-section" style="display:none">
           <div class="info-section-label">✈ 行程景點</div>
           <div class="info-trip-tags" id="info-trip-tags"></div>
+        </div>
+        <div class="info-divider"></div>
+        <div class="info-section">
+          <div class="info-section-label">重要歷史事件</div>
+          <div class="history-list" id="info-history"></div>
         </div>
       </div>
     </div>
@@ -464,114 +515,237 @@ const DISTRICTS = {
     population: '235,900', area: '12.44 km²',
     landmark: '中環金融區、太平山頂、荷李活道',
     desc: '香港的政治及商業核心，匯聚政府總部、中環金融區及維多利亞港海濱，兼具百年歷史建築與現代摩天大廈。',
+    wiki: 'Central_and_Western_District',
+    history: [
+      { year: '1841', event: '英軍在水坑口登陸，宣告香港開埠，中環一帶成為殖民政府核心。' },
+      { year: '1842', event: '《南京條約》簽訂，香港島正式割讓英國，上環逐漸發展為華人商業區。' },
+      { year: '1888', event: '山頂纜車通車，太平山頂成為殖民地歐籍人士居所，至今仍是地標。' },
+      { year: '1997', event: '中英政權交接典禮在添馬艦舉行，香港回歸中國。' },
+    ],
     trip: ['蓮香樓（港點早茶）','中環半山扶手電梯','大館・域多利監獄舊址','石板街','沾仔記（米其林雲吞麵）','中環街市','兆成行（香水伴手禮）','朱榮記・福成元記（公雞碗）']
   },
   'Wan Chai': {
     name: '灣仔區', eng: 'Wan Chai', region: 'hk', color: '#D44848',
     population: '180,800', area: '9.83 km²',
-    landmark: '香港會議展覽中心、金紫荊廣場',
+    landmark: '香港會議展覽中心、金紫荊廣場、跑馬地',
     desc: '香港重要的商業及娛樂中心，以多元文化著稱，匯聚本地特色小店、老字號食肆與國際品牌。',
+    wiki: 'Wan_Chai_District',
+    history: [
+      { year: '1841', event: '灣仔為香港開埠後最早發展的地區之一，初期以木屋及漁港為主。' },
+      { year: '1930s', event: '灣仔酒吧街文化形成，成為水兵及外籍人士的娛樂中心。' },
+      { year: '1997', event: '香港會議展覽中心新翼落成，主權移交典禮在此舉行，金紫荊廣場成為紀念地標。' },
+    ],
     trip: ['甘牌燒鵝','藍屋 Blue House','香港賽馬博物館（跑馬地）']
   },
   'Eastern': {
     name: '東區', eng: 'Eastern', region: 'hk', color: '#F07070',
     population: '527,700', area: '18.85 km²',
-    landmark: '鰂魚涌、太古城、柴灣',
-    desc: '香港島東部最大行政區，以住宅區為主，太古城為著名的大型商業及居住中心。',
-    trip: ['北角春秧街市（叮叮車）','C Dessert・甜姨姨私房甜品（天后）']
+    landmark: '鰂魚涌、太古城、北角春秧街',
+    desc: '香港島東部最大行政區，以住宅區為主，太古城為著名的大型商業及居住中心，北角保存舊式街市文化。',
+    wiki: 'Eastern_District,_Hong_Kong',
+    history: [
+      { year: '1949', event: '大批國共內戰難民湧入北角，帶來上海移民文化，「小上海」之名由此而來。' },
+      { year: '1972', event: '海底隧道通車，連接港島與九龍，徹底改變東區的交通格局。' },
+      { year: '1989', event: '港島線延伸至鰂魚涌，太古坊商業區成為東區新核心。' },
+    ],
+    trip: ['北角春秧街市（叮叮車穿街）','C Dessert・甜姨姨私房甜品（天后）']
   },
   'Southern': {
     name: '南區', eng: 'Southern', region: 'hk', color: '#E88888',
     population: '270,400', area: '38.85 km²',
     landmark: '赤柱、海洋公園、香港仔漁村',
-    desc: '擁有香港島最大面積，以自然景觀著稱，包括赤柱海灘、南丫島及充滿漁港氣息的香港仔。'
+    desc: '擁有香港島最大面積，以自然景觀著稱，包括赤柱海灘、南丫島及充滿漁港氣息的香港仔。',
+    wiki: 'Southern_District,_Hong_Kong',
+    history: [
+      { year: '1841', event: '英軍在赤柱設立早期軍事基地，赤柱為港島開埠初期最大的歐人定居點。' },
+      { year: '1942', event: '日本佔領期間，赤柱設立戰俘營，關押大批英美戰俘，歷史刻痕至今可見。' },
+      { year: '1977', event: '海洋公園正式開幕，成為香港最受歡迎的主題樂園之一。' },
+    ],
+    trip: ['赤柱市集及海濱','淺水灣泳灘','海洋公園','香港仔漁港（避風塘）','南丫島海鮮']
   },
   'Yau Tsim Mong': {
     name: '油尖旺區', eng: 'Yau Tsim Mong', region: 'kln', color: '#4A90D9',
     population: '320,200', area: '6.99 km²',
     landmark: '旺角、尖沙咀、廟街夜市',
     desc: '九龍最繁華的購物及旅遊區，廟街夜市、廣東道名店及充滿活力的旺角街頭文化各具特色。',
-    trip: ['廟街夜市','榕哥陳皮燒鵝（砵蘭街）','維多利亞港夜景','女人街','女人街食飯公司（煲仔飯）','珍妮曲奇聰明小熊（尖沙咀）']
+    wiki: 'Yau_Tsim_Mong_District',
+    history: [
+      { year: '1860', event: '《北京條約》簽訂，九龍半島割讓英國，尖沙咀成為最早發展的九龍地區。' },
+      { year: '1910', event: '廣九鐵路尖沙咀總站啟用，連接香港與廣州，奠定尖沙咀交通樞紐地位。' },
+      { year: '1978', event: '地鐵（港鐵）觀塘線通車，旺角及油麻地更趨繁盛，廟街夜市文化盛極一時。' },
+    ],
+    trip: ['廟街夜市','榕哥陳皮燒鵝（砵蘭街）','維多利亞港夜景','女人街（通菜街）','女人街食飯公司（煲仔飯）','珍妮曲奇聰明小熊（尖沙咀）']
   },
   'Sham Shui Po': {
     name: '深水埗區', eng: 'Sham Shui Po', region: 'kln', color: '#3A7FC8',
     population: '405,900', area: '9.35 km²',
     landmark: '鴨寮街、黃金電腦商場、李鄭屋漢墓',
     desc: '以電子產品及舊式街市著稱，鴨寮街是全港著名的二手電子集散地，區內亦保存有珍貴的漢代古跡。',
-    trip: ['前深水埗配水庫（建於1904年，石硤尾）']
+    wiki: 'Sham_Shui_Po_District',
+    history: [
+      { year: '1904', event: '石硤尾配水庫建成，為當時香港最大的供水設施，現已列為法定古蹟。' },
+      { year: '1941', event: '日本佔領後深水埗兵房成為戰俘集中營，關押大批英籍及盟軍戰俘。' },
+      { year: '1953', event: '石硤尾大火奪去五萬人家園，促使政府興建公共房屋，開創香港公屋政策先河。' },
+    ],
+    trip: ['前深水埗配水庫（建於1904年，石硤尾）','鴨寮街電子市集','李鄭屋漢墓博物館']
   },
   'Kowloon City': {
     name: '九龍城區', eng: 'Kowloon City', region: 'kln', color: '#5AA0E9',
     population: '381,500', area: '10.02 km²',
     landmark: '宋王臺、土瓜灣、啟德發展區',
-    desc: '歷史豐富的行政區，昔日啟德機場所在地，現正發展成新的都市核心，土瓜灣保留大量本地工業歷史痕跡。'
+    desc: '歷史豐富的行政區，昔日啟德機場所在地，現正發展成新的都市核心，土瓜灣保留大量本地工業歷史痕跡。',
+    wiki: 'Kowloon_City_District',
+    history: [
+      { year: '1898', event: '英清簽訂租借新界條約，唯九龍城寨主權存疑，形成長達一世紀的「三不管」地帶。' },
+      { year: '1954', event: '九龍城寨人口急增，發展成全球人口密度最高的城市聚落，無政府自治文化形成。' },
+      { year: '1994', event: '九龍城寨清拆完畢，原址改建為九龍寨城公園，保留歷史城牆遺跡。' },
+      { year: '1998', event: '啟德機場正式關閉，舊跑道及機場用地展開大規模重新規劃。' },
+    ],
+    trip: ['九龍城寨公園','宋王臺花園','九龍城潮州美食街','侯王廟（宋朝文物）']
   },
   'Wong Tai Sin': {
     name: '黃大仙區', eng: 'Wong Tai Sin', region: 'kln', color: '#6AB0F9',
     population: '419,500', area: '9.30 km²',
     landmark: '黃大仙祠、鑽石山荷里活廣場',
-    desc: '以黃大仙祠聞名，為香港著名道教廟宇，每年農曆新年吸引大批善信及旅客前往祈福。'
+    desc: '以黃大仙祠聞名，為香港著名道教廟宇，每年農曆新年吸引大批善信及旅客前往祈福。',
+    wiki: 'Wong_Tai_Sin_District',
+    history: [
+      { year: '1921', event: '梁仁菴道長攜黃大仙師壇場輾轉由廣東遷港，初設於乍畏街。' },
+      { year: '1950', event: '黃大仙祠在現址竹園重建，逐漸成為香港最著名的宗教朝聖地。' },
+      { year: '1970s', event: '彩虹邨、黃大仙邨等大型公共屋邨相繼落成，區內人口急速膨脹。' },
+    ],
+    trip: ['黃大仙祠','志蓮淨苑','南蓮園池（唐代風格庭園）','鑽石山荷里活廣場']
   },
   'Kwun Tong': {
     name: '觀塘區', eng: 'Kwun Tong', region: 'kln', color: '#2A70B8',
     population: '648,200', area: '11.27 km²',
     landmark: '觀塘工業區（創意產業）、APM 商場、觀塘海濱',
-    desc: '香港人口最多的行政區，舊工業區正轉型為商業及創意產業中心，海濱長廊為市民熱門休閒地點。'
+    desc: '香港人口最多的行政區，舊工業區正轉型為商業及創意產業中心，海濱長廊為市民熱門休閒地點。',
+    wiki: 'Kwun_Tong_District',
+    history: [
+      { year: '1954', event: '觀塘工業邨成立，為香港首個規劃工業區，推動戰後製造業高速發展。' },
+      { year: '1970s', event: '觀塘成為香港最重要的工業重鎮，紡織、塑膠及玩具業蓬勃興旺。' },
+      { year: '2010s', event: '工廈活化政策推行，大批廠廈改建為創意辦公室及藝術空間，工業城市重生。' },
+    ],
+    trip: ['觀塘海濱長廊','APM 購物中心','牛頭角下邨（懷舊街景）','工廠大廈創意藝術區']
   },
   'Kwai Tsing': {
     name: '葵青區', eng: 'Kwai Tsing', region: 'nt', color: '#5AAE6A',
     population: '497,000', area: '23.34 km²',
-    landmark: '葵涌貨櫃碼頭、青衣城',
-    desc: '葵涌貨櫃碼頭為全球最繁忙港口之一，是香港對外貿易的重要基地；青衣島則有大型商場及住宅發展。'
+    landmark: '葵涌貨櫃碼頭、青衣城、青馬大橋',
+    desc: '葵涌貨櫃碼頭為全球最繁忙港口之一，是香港對外貿易的重要基地；青衣島則有大型商場及住宅發展。',
+    wiki: 'Kwai_Tsing_District',
+    history: [
+      { year: '1972', event: '葵涌貨櫃碼頭正式啟用，引領香港成為全球重要的轉口貿易港，奠定繁榮根基。' },
+      { year: '1982', event: '地鐵荃灣線延伸至葵興及葵芳，葵青與市區交通更緊密相連。' },
+      { year: '1997', event: '青馬大橋落成，全長2.2公里，是當時全球最長的行車鐵路吊橋。' },
+    ],
+    trip: ['葵涌貨櫃碼頭觀景台','青衣城購物','青馬大橋觀景台（汀九橋）']
   },
   'Tsuen Wan': {
     name: '荃灣區', eng: 'Tsuen Wan', region: 'nt', color: '#4A9E5A',
     population: '320,000', area: '62.74 km²',
     landmark: '城門水塘、三棟屋博物館、荃灣廣場',
-    desc: '新界最早發展的新市鎮之一，城門水塘為熱門郊遊勝地，亦保存有逾百年歷史的客家圍村文化。'
+    desc: '新界最早發展的新市鎮之一，城門水塘為熱門郊遊勝地，亦保存有逾百年歷史的客家圍村文化。',
+    wiki: 'Tsuen_Wan_District',
+    history: [
+      { year: '1960s', event: '荃灣新市鎮發展計劃啟動，成為新界首批新市鎮，大量工廠及屋邨相繼興建。' },
+      { year: '1982', event: '地鐵荃灣線通車，荃灣與市區交通時間大幅縮短，促進人口大量遷入。' },
+      { year: '2003', event: '西鐵荃灣西站通車，荃灣成為連接新界西的重要交通樞紐。' },
+    ],
+    trip: ['城門水塘（郊遊）','三棟屋客家博物館','東普陀寺','荃灣老圍村']
   },
   'Tuen Mun': {
     name: '屯門區', eng: 'Tuen Mun', region: 'nt', color: '#6BBF7B',
     population: '487,100', area: '82.89 km²',
     landmark: '青山禪院、黃金海岸、屯門公路',
-    desc: '新界西部重要新市鎮，青山禪院為香港最古老的佛寺之一，黃金海岸沙灘是夏日消暑熱點。'
+    desc: '新界西部重要新市鎮，青山禪院為香港最古老的佛寺之一，黃金海岸沙灘是夏日消暑熱點。',
+    wiki: 'Tuen_Mun_District',
+    history: [
+      { year: '5世紀', event: '杯渡禪師相傳於青山修行，為屯門留下最早的宗教歷史記載。' },
+      { year: '1970s', event: '屯門新市鎮發展展開，大規模填海及住宅興建，吸引大批居民遷入。' },
+      { year: '1988', event: '輕鐵系統通車，連接屯門各主要地區，成為區內主要的公共交通工具。' },
+    ],
+    trip: ['青山禪院','黃金海岸泳灘','屯門公園','龍鼓灘（觀賞風車）']
   },
   'Yuen Long': {
     name: '元朗區', eng: 'Yuen Long', region: 'nt', color: '#3A8E4A',
     population: '614,000', area: '138.55 km²',
     landmark: '香港濕地公園、錦田古圍村、大棠楓香林',
-    desc: '新界面積最大的行政區，濕地公園為國際重要濕地，大棠楓香林每年深秋吸引大批遊人觀賞紅葉。'
+    desc: '新界面積最大的行政區，濕地公園為國際重要濕地，大棠楓香林每年深秋吸引大批遊人觀賞紅葉。',
+    wiki: 'Yuen_Long_District',
+    history: [
+      { year: '1898', event: '新界租借，元朗鄉議局成立，客家及本地圍村文化得以保存，錦田鄧族圍村傳承至今。' },
+      { year: '1977', event: '輕鐵元朗段通車，連接元朗與屯門，結束新界西北長期依賴公路的局面。' },
+      { year: '2006', event: '香港濕地公園正式開放，被列入《拉姆薩爾公約》重要濕地名錄。' },
+    ],
+    trip: ['香港濕地公園','錦田水頭村（古圍牆）','大棠楓香林（秋季）','元朗大押老街']
   },
   'North': {
     name: '北區', eng: 'North', region: 'nt', color: '#7CCE8C',
     population: '313,600', area: '136.61 km²',
     landmark: '沙頭角、落馬洲、文錦渡',
-    desc: '與深圳接壤的邊境行政區，保留多個傳統客家圍村，現正積極發展北部都會區，推動跨境融合。'
+    desc: '與深圳接壤的邊境行政區，保留多個傳統客家圍村，現正積極發展北部都會區，推動跨境融合。',
+    wiki: 'North_District,_Hong_Kong',
+    history: [
+      { year: '1898', event: '新界租借條約確立，沙頭角劃為邊境地區，中英街成為兩地分界，形成獨特的邊境文化。' },
+      { year: '1951', event: '中英街設立邊境管制，分隔香港與中國大陸，成為冷戰時期的象徵性地標。' },
+      { year: '2024', event: '沙頭角碼頭區局部開放旅遊，遊客可申請進入，見證中英街歷史場景。' },
+    ],
+    trip: ['沙頭角中英街（需申請許可）','紅花嶺郊野公園','鹿頸沼澤（賞鳥）','雙魚河生態農莊']
   },
   'Tai Po': {
     name: '大埔區', eng: 'Tai Po', region: 'nt', color: '#2A7E3A',
     population: '307,000', area: '136.15 km²',
     landmark: '吐露港、大埔墟街市、大尾篤',
-    desc: '環抱吐露港的寧靜行政區，設有香港鐵路博物館，大尾篤是賞鳥、獨木舟及郊遊的著名地點。'
+    desc: '環抱吐露港的寧靜行政區，設有香港鐵路博物館，大尾篤是賞鳥、獨木舟及郊遊的著名地點。',
+    wiki: 'Tai_Po_District',
+    history: [
+      { year: '1892', event: '大埔墟創立，成為新界北部重要的集貿市場，圩日文化延續至今。' },
+      { year: '1910', event: '廣九鐵路大埔墟站啟用，結束新界交通閉塞局面，帶動大埔發展。' },
+      { year: '1985', event: '香港鐵路博物館在舊大埔墟火車站開幕，保存本地鐵路百年歷史。' },
+    ],
+    trip: ['大埔墟傳統街市','香港鐵路博物館','大尾篤划艇及賞鳥','吐露港單車徑']
   },
   'Sha Tin': {
     name: '沙田區', eng: 'Sha Tin', region: 'nt', color: '#5BBE6B',
     population: '685,000', area: '68.74 km²',
     landmark: '沙田馬場、城門河、萬佛寺',
-    desc: '新界最大的新市鎮，沙田馬場是香港賽馬的重要場地，城門河畔的單車徑深受市民喜愛。'
+    desc: '新界最大的新市鎮，沙田馬場是香港賽馬的重要場地，城門河畔的單車徑深受市民喜愛。',
+    wiki: 'Sha_Tin_District',
+    history: [
+      { year: '1978', event: '沙田新市鎮發展啟動，大規模填海拓地，城門河疏浚工程奠定現代沙田格局。' },
+      { year: '1981', event: '九廣鐵路東鐵沙田站通車，新市鎮與市區的交通連結大為強化。' },
+      { year: '1994', event: '沙田馬場觀眾看台擴建，可容納八萬人，成為全球最大的賽馬場之一。' },
+    ],
+    trip: ['沙田馬場（賽事日）','城門河畔單車徑','萬佛寺（1萬8千尊佛像）','車公廟（農曆新年）']
   },
   'Sai Kung': {
     name: '西貢區', eng: 'Sai Kung', region: 'nt', color: '#1A6E2A',
     population: '461,000', area: '129.65 km²',
     landmark: '麥理浩徑、萬宜水庫、西貢市中心',
-    desc: '香港的「後花園」，擁有大量郊野公園及海岸公園，麥理浩徑為香港最著名的長途遠足路線。'
+    desc: '香港的「後花園」，擁有大量郊野公園及海岸公園，麥理浩徑為香港最著名的長途遠足路線。',
+    wiki: 'Sai_Kung_District',
+    history: [
+      { year: '1979', event: '麥理浩徑正式啟用，全長100公里橫越九個郊野公園，是亞洲最著名的遠足徑之一。' },
+      { year: '1996', event: '西貢海下灣海岸公園成立，保護珊瑚及海洋生態，成為本地潛水聖地。' },
+      { year: '2009', event: '香港聯合國教科文組織世界地質公園正式成立，西貢火山岩柱群震驚世界。' },
+    ],
+    trip: ['西貢海鮮街','麥理浩徑第一段（西灣）','萬宜水庫東壩（六角岩柱）','清水灣第一灘']
   },
   'Islands': {
     name: '離島區', eng: 'Islands', region: 'nt', color: '#8BCE9C',
     population: '176,000', area: '175.07 km²',
     landmark: '大嶼山、香港國際機場、大澳漁村',
     desc: '香港陸地面積最大的行政區，包含大嶼山等多個離島，大澳保留了傳統棚屋漁村的獨特面貌。',
-    trip: ['張保仔洞（長洲，搭船）']
+    wiki: 'Islands_District,_Hong_Kong',
+    history: [
+      { year: '1898', event: '新界租借條約將大嶼山等離島納入英治範圍，傳統漁村生活形態延續。' },
+      { year: '1993', event: '天壇大佛（昂坪大佛）開光，高達34米，成為全球最大的室外坐佛之一。' },
+      { year: '1998', event: '赤鱲角新機場正式啟用，以大型填海工程建成，成為全球最繁忙機場之一。' },
+      { year: '2005', event: '昂坪360纜車通車，由東涌延伸至昂坪，空中俯瞰大嶼山絕景。' },
+    ],
+    trip: ['張保仔洞（長洲，搭船）','大澳棚屋漁村','天壇大佛・昂坪市集','東涌炮台（歷史遺址）']
   }
 };
 
@@ -850,6 +1024,35 @@ function updateStats() {
   document.getElementById('lbl-errors').textContent = `錯誤次數：${errors}`;
 }
 
+// Image cache to avoid re-fetching
+const imgCache = {};
+
+async function loadDistrictImage(wiki, region, imgEl, skeleton) {
+  if (imgCache[wiki]) {
+    imgEl.src = imgCache[wiki];
+    imgEl.classList.add('loaded');
+    skeleton.classList.add('hidden');
+    return;
+  }
+  try {
+    const res = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wiki)}`
+    );
+    if (!res.ok) throw new Error('no response');
+    const data = await res.json();
+    const src  = data.thumbnail?.source;
+    if (!src) throw new Error('no image');
+    imgCache[wiki] = src;
+    imgEl.onload = () => {
+      imgEl.classList.add('loaded');
+      skeleton.classList.add('hidden');
+    };
+    imgEl.src = src;
+  } catch (_) {
+    skeleton.innerHTML = `<span class="skeleton-text" style="font-size:13px">暫無圖片</span>`;
+  }
+}
+
 function showInfo(ename) {
   const d = DISTRICTS[ename];
   const r = REGION_META[d.region];
@@ -868,6 +1071,7 @@ function showInfo(ename) {
   document.getElementById('info-landmark').textContent = d.landmark;
   document.getElementById('info-desc').textContent     = d.desc;
 
+  // Trip tags
   const tripSection = document.getElementById('info-trip-section');
   const tripTags    = document.getElementById('info-trip-tags');
   if (d.trip && d.trip.length) {
@@ -876,6 +1080,33 @@ function showInfo(ename) {
   } else {
     tripSection.style.display = 'none';
   }
+
+  // History timeline
+  const histEl = document.getElementById('info-history');
+  if (d.history && d.history.length) {
+    histEl.innerHTML = d.history.map(h =>
+      `<div class="history-item">
+         <span class="history-year ${d.region}">${h.year}</span>
+         <span class="history-event">${h.event}</span>
+       </div>`
+    ).join('');
+  } else {
+    histEl.innerHTML = '';
+  }
+
+  // Wikipedia image
+  const imgEl   = document.getElementById('info-image');
+  const skeleton = document.getElementById('info-image-skeleton');
+  imgEl.classList.remove('loaded');
+  imgEl.src = '';
+  skeleton.classList.remove('hidden');
+  skeleton.innerHTML = `
+    <svg class="skeleton-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5">
+      <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+      <polyline points="21 15 16 10 5 21"/>
+    </svg>
+    <span class="skeleton-text">載入景點圖片…</span>`;
+  if (d.wiki) loadDistrictImage(d.wiki, d.region, imgEl, skeleton);
 }
 
 let toastTimer = null;
