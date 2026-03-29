@@ -204,6 +204,17 @@
     .info-section    { display: flex; flex-direction: column; gap: 6px; }
     .info-section-label { font-size: 12px; font-weight: 600; color: #9CA3AF; }
     .info-section-text  { font-size: 13px; color: #374151; line-height: 1.65; }
+    .info-trip-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+    .info-trip-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      background: #FEF3C7;
+      color: #92400E;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.5;
+    }
 
     /* ── Toast ── */
     #toast {
@@ -411,6 +422,10 @@
           <div class="info-section-label">區域特色</div>
           <div class="info-section-text" id="info-desc">—</div>
         </div>
+        <div class="info-section" id="info-trip-section" style="display:none">
+          <div class="info-section-label">✈ 行程景點</div>
+          <div class="info-trip-tags" id="info-trip-tags"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -448,19 +463,22 @@ const DISTRICTS = {
     name: '中西區', eng: 'Central and Western', region: 'hk', color: '#E05A5A',
     population: '235,900', area: '12.44 km²',
     landmark: '中環金融區、太平山頂、荷李活道',
-    desc: '香港的政治及商業核心，匯聚政府總部、中環金融區及維多利亞港海濱，兼具百年歷史建築與現代摩天大廈。'
+    desc: '香港的政治及商業核心，匯聚政府總部、中環金融區及維多利亞港海濱，兼具百年歷史建築與現代摩天大廈。',
+    trip: ['蓮香樓（港點早茶）','中環半山扶手電梯','大館・域多利監獄舊址','石板街','沾仔記（米其林雲吞麵）','中環街市','兆成行（香水伴手禮）','朱榮記・福成元記（公雞碗）']
   },
   'Wan Chai': {
     name: '灣仔區', eng: 'Wan Chai', region: 'hk', color: '#D44848',
     population: '180,800', area: '9.83 km²',
     landmark: '香港會議展覽中心、金紫荊廣場',
-    desc: '香港重要的商業及娛樂中心，以多元文化著稱，匯聚本地特色小店、老字號食肆與國際品牌。'
+    desc: '香港重要的商業及娛樂中心，以多元文化著稱，匯聚本地特色小店、老字號食肆與國際品牌。',
+    trip: ['甘牌燒鵝','藍屋 Blue House','香港賽馬博物館（跑馬地）']
   },
   'Eastern': {
     name: '東區', eng: 'Eastern', region: 'hk', color: '#F07070',
     population: '527,700', area: '18.85 km²',
     landmark: '鰂魚涌、太古城、柴灣',
-    desc: '香港島東部最大行政區，以住宅區為主，太古城為著名的大型商業及居住中心。'
+    desc: '香港島東部最大行政區，以住宅區為主，太古城為著名的大型商業及居住中心。',
+    trip: ['北角春秧街市（叮叮車）','C Dessert・甜姨姨私房甜品（天后）']
   },
   'Southern': {
     name: '南區', eng: 'Southern', region: 'hk', color: '#E88888',
@@ -472,13 +490,15 @@ const DISTRICTS = {
     name: '油尖旺區', eng: 'Yau Tsim Mong', region: 'kln', color: '#4A90D9',
     population: '320,200', area: '6.99 km²',
     landmark: '旺角、尖沙咀、廟街夜市',
-    desc: '九龍最繁華的購物及旅遊區，廟街夜市、廣東道名店及充滿活力的旺角街頭文化各具特色。'
+    desc: '九龍最繁華的購物及旅遊區，廟街夜市、廣東道名店及充滿活力的旺角街頭文化各具特色。',
+    trip: ['廟街夜市','榕哥陳皮燒鵝（砵蘭街）','維多利亞港夜景','女人街','女人街食飯公司（煲仔飯）','珍妮曲奇聰明小熊（尖沙咀）']
   },
   'Sham Shui Po': {
     name: '深水埗區', eng: 'Sham Shui Po', region: 'kln', color: '#3A7FC8',
     population: '405,900', area: '9.35 km²',
     landmark: '鴨寮街、黃金電腦商場、李鄭屋漢墓',
-    desc: '以電子產品及舊式街市著稱，鴨寮街是全港著名的二手電子集散地，區內亦保存有珍貴的漢代古跡。'
+    desc: '以電子產品及舊式街市著稱，鴨寮街是全港著名的二手電子集散地，區內亦保存有珍貴的漢代古跡。',
+    trip: ['前深水埗配水庫（建於1904年，石硤尾）']
   },
   'Kowloon City': {
     name: '九龍城區', eng: 'Kowloon City', region: 'kln', color: '#5AA0E9',
@@ -550,7 +570,8 @@ const DISTRICTS = {
     name: '離島區', eng: 'Islands', region: 'nt', color: '#8BCE9C',
     population: '176,000', area: '175.07 km²',
     landmark: '大嶼山、香港國際機場、大澳漁村',
-    desc: '香港陸地面積最大的行政區，包含大嶼山等多個離島，大澳保留了傳統棚屋漁村的獨特面貌。'
+    desc: '香港陸地面積最大的行政區，包含大嶼山等多個離島，大澳保留了傳統棚屋漁村的獨特面貌。',
+    trip: ['張保仔洞（長洲，搭船）']
   }
 };
 
@@ -846,6 +867,15 @@ function showInfo(ename) {
   document.getElementById('info-area').textContent     = d.area;
   document.getElementById('info-landmark').textContent = d.landmark;
   document.getElementById('info-desc').textContent     = d.desc;
+
+  const tripSection = document.getElementById('info-trip-section');
+  const tripTags    = document.getElementById('info-trip-tags');
+  if (d.trip && d.trip.length) {
+    tripTags.innerHTML = d.trip.map(s => `<span class="info-trip-tag">${s}</span>`).join('');
+    tripSection.style.display = '';
+  } else {
+    tripSection.style.display = 'none';
+  }
 }
 
 let toastTimer = null;
